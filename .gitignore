@@ -1,0 +1,6 @@
+*.o
+*.elf
+*.bin
+*.swp
+bx_enh_dbg.ini
+game.bin.lock
