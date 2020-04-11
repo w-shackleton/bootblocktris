@@ -1,0 +1,32 @@
+; This macro can only be used once: this is fine, we are putting it an a macro
+; for readability
+; Input: nothing
+; Output: keycode in AL
+%macro GETKEY 0
+    ; int16/ah=11h: Keyboard: Check for enhanced stroke
+    mov ah, 0x11
+    int 0x16
+
+    ; ZF clear if keystroke available: return it.
+    jne getkey_return_popped_key
+    ; else: return 0
+    xor ax, ax
+    jmp getkey_continue
+getkey_return_popped_key:
+    ; int16/ah=10h: Keyboard: Get enhanced stroke
+    mov ah, 0x10
+    int 0x16
+    ; Returns character in AL, scan code in AH. Clear top half of ax
+    mov ah, 0
+getkey_continue:
+%endmacro
+
+%macro SLEEP 0
+    mov ah, 0x86
+    ; cx - high word
+    ; dx - low word
+    ; 150,000 = 0x249F0. Approximate and zero-out dx
+    mov cx, 0x2
+    xor dx, dx
+    int 15h
+%endmacro
