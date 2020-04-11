@@ -1,3 +1,7 @@
+%include "memory.mac"
+
+%define BREAKPOINT xchg bx, bx
+
 ; This macro can only be used once: this is fine, we are putting it an a macro
 ; for readability
 ; Input: nothing
@@ -29,4 +33,12 @@ getkey_continue:
     mov cx, 0x2
     xor dx, dx
     int 15h
+%endmacro
+
+%macro CLS 0
+    ; set screen to gray
+    mov cx, VGA_SIZE
+    xor di, di
+    mov al, 0x14
+    rep stosb
 %endmacro

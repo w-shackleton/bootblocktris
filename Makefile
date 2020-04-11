@@ -3,8 +3,11 @@ all: game.bin
 boot.o: boot.asm utils.mac memory.mac
 	nasm -f elf32 boot.asm -o boot.o
 
-game.elf: link.ld boot.o
-	ld -melf_i386 -T link.ld boot.o -o game.elf
+memory.o: memory.asm memory.mac
+	nasm -f elf32 memory.asm -o memory.o
+
+game.elf: link.ld boot.o memory.o
+	ld -melf_i386 -T link.ld boot.o memory.o -o game.elf
 
 game.bin: game.elf
 	objcopy -O binary game.elf game.bin

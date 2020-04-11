@@ -17,6 +17,17 @@ SECTIONS
         SHORT(0xaa55);
     }
 
+    /* Place bss after the end of the VGA RAM */
+    . = (320 * 200);
+    .bss : SUBALIGN(4) {
+        __bss_start = .;
+        *(COMMON);
+        *(.bss)
+        . = ALIGN(4);
+        __bss_end = .;
+    }
+    __bss_sizeb = SIZEOF(.bss);
+
     /* Remove sections that won't be relevant to us */
     /DISCARD/ : {
         *(.eh_frame);
