@@ -41,13 +41,13 @@ main:
     mov byte [0x0000], 0x0F
     mov byte [0x0005], 0x0F
 
-    mov word [gameboard], 0xAAAA
-    mov word [gameboard+2], 0xCCCC
-    mov word [gameboard+4], 0x1234
     mov word [gameboard+6], 0x0101
     mov word [gameboard+8], 0x0101
     mov word [gameboard+10], 0x1010
     mov word [gameboard+12], 0x1010
+
+    mov word [gameboard_floating    ], 0b0000000111000000
+    mov word [gameboard_floating + 2], 0b0000000010000000
 
 ES_START equ (VGA_SEGMENT + (SCREEN_Y_START * VGA_WIDTH + SCREEN_X_START) / 0x10)
 
@@ -60,12 +60,13 @@ draw_screen:
     ; to es:di
     mov ax, ES_START
     mov es, ax
-    ; Set bx as a pointer to the gameboard. Every Y loop we increase it to
-    ; load the next line.
-    mov bx, gameboard
+    ; Set bx as the array index into gameboard.
+    xor bx, bx
 draw_line:
     ; dx holds the current line we're drawing
-    mov dx, [bx]
+    mov dx, [bx + gameboard]
+    ; merge in the floating part of the board
+    or dx, [bx + gameboard_floating]
     xor di, di
 
 draw_cell:
@@ -108,7 +109,7 @@ draw_cell:
     inc bx
 
 draw_skip_increment_board:
-    cmp bx, (gameboard + BOARD_WIDTH * BOARD_HEIGHT)
+    cmp bx, (BOARD_WIDTH * BOARD_HEIGHT)
     jne draw_line
 
     ; Reset es back to what it was
