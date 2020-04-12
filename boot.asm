@@ -120,11 +120,97 @@ draw_skip_increment_board:
 
 
 
-    GETKEY
-
-    mov bx, ax
-    mov byte [bx] , 0x0F
-
     SLEEP
+
+take_user_input:
+    GETKEY ; Loads the pressed keystroke into ax
+
+    ; w = 0x77 0111 0111
+    ; a = 0x61 0110 0001
+    ; s = 0x73 0111 0011
+    ; d = 0x64 0110 0100
+    ;                ^^
+    ; We look at bits 1 and 2 to determine the direction of travel. We use a
+    ; bitmask to turn this into the numbers 0,2,4,6, which can be used in the
+    ; word-sized jump table below.
+
+    test al, al
+
+    ; If no key was pressed then progress as normal
+    jz case_end
+
+    and al, 0x06
+
+    ; al now contains the jump table location mentioned above. Before we kick
+    ; off the jump table, calculate a few useful things first.
+
+    ; and together all rows into bx so that we can see if we're hitting the
+    ; edge
+    xor bx, bx
+    mov cx, BOARD_HEIGHT
+    mov di, gameboard_floating
+calculate_edge_loop:
+    or bx, [di]
+    inc di
+    inc di
+    loop calculate_edge_loop
+
+    ; Now go to the jump table to decide what logic to run
+
+    ; al is still the same from above and corresponds to the keystroke
+    BREAKPOINT
+    xor ah, ah
+    mov di, ax
+    jmp [cs:di + jump_table]
+
+jump_table:
+    dw case_left ; 0x00 - a = left
+    dw case_end ; 0x01 - s = down
+    dw case_right ; 0x10 - d = right
+    dw case_end ; 0x11 - w = up
+
+case_left:
+    ; Check if we've hit the limit. If we have then don't allow moving left
+    and bl, 0x01
+    jnz case_end
+    mov cx, BOARD_HEIGHT
+    mov di, gameboard_floating
+case_left_loop:
+    shr word [di], 1
+    inc di
+    inc di
+    loop case_left_loop
+    jmp case_end
+
+case_right:
+    ; Check if we've hit the limit. If we have then don't allow moving right
+    and bh, 0x80
+    jnz case_end
+    mov cx, BOARD_HEIGHT
+    mov di, gameboard_floating
+case_right_loop:
+    shl word [di], 1
+    inc di
+    inc di
+    loop case_right_loop
+
+case_end:
+
+
+progress_game:
+    ; PROGRESS GAME STATE
+    ; 1. Move floating component down
+    ; Load address of bottom line of board into si
+    mov si, gameboard_floating + (BOARD_WIDTH * BOARD_HEIGHT - BOARD_WIDTH * 2)
+    ; Load address of penultimate line of board into di
+    mov di, gameboard_floating + (BOARD_WIDTH * BOARD_HEIGHT - BOARD_WIDTH * 1)
+    ; Set number of copies to make
+    mov cx, (BOARD_HEIGHT - 1)
+    ; set direction flag to go backwards through memory
+    std
+    rep movsw ; copy si -> di in 1 word pieces
+    cld
+    ; Clear the top row. At this point the address of that is in di
+    mov word [di], 0x0000
 
     jmp draw_screen
