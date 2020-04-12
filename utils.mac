@@ -29,9 +29,8 @@ getkey_continue:
     mov ah, 0x86
     ; cx - high word
     ; dx - low word
-    ; 150,000 = 0x249F0. Approximate and zero-out dx
-    mov cx, 0x2
-    xor dx, dx
+    xor cx, cx
+    mov dx, 0x8000
     int 15h
 %endmacro
 
@@ -40,5 +39,38 @@ getkey_continue:
     mov cx, VGA_SIZE
     xor di, di
     mov al, 0x14
+    rep stosb
+%endmacro
+
+%macro COPY_BOARD 2
+    mov si, %1
+    mov di, %2
+    mov cx, BOARD_WIDTH * BOARD_HEIGHT
+    rep movsb
+%endmacro
+
+%macro MERGE_BOARD 2
+    mov cx, BOARD_WIDTH * BOARD_HEIGHT
+%%or_loop:
+    mov si, cx
+    mov al, [si+%1]
+    or [si+%2], al
+    loop %%or_loop
+%endmacro
+
+%macro COLLIDE_BOARDS 2
+    mov cx, BOARD_WIDTH * BOARD_HEIGHT
+%%collide_loop:
+    mov si, cx
+    mov al, [si+%1]
+    and al, [si+%2]
+    ; loope will loop until the and above returned not zero, aka we collided
+    loope %%collide_loop
+%endmacro
+
+%macro CLEAR_BOARD 2
+    mov cx, BOARD_WIDTH * BOARD_HEIGHT + %2
+    mov di, %1
+    xor ax, ax
     rep stosb
 %endmacro

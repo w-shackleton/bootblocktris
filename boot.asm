@@ -38,14 +38,6 @@ setcs:
 main:
     CLS
 
-    mov byte [0x0000], 0x0F
-    mov byte [0x0005], 0x0F
-
-    mov word [gameboard+6], 0x0101
-    mov word [gameboard+8], 0x0101
-    mov word [gameboard+10], 0x1010
-    mov word [gameboard+12], 0x1010
-
     mov word [gameboard_floating    ], 0b0000000111000000
     mov word [gameboard_floating + 2], 0b0000000010000000
 
@@ -123,6 +115,9 @@ draw_skip_increment_board:
     SLEEP
 
 take_user_input:
+    ; Backup the game state so that we can revert if an illegal move is taken
+    COPY_BOARD gameboard_floating, gameboard_floating_backup
+
     GETKEY ; Loads the pressed keystroke into ax
 
     ; w = 0x77 0111 0111
@@ -158,14 +153,15 @@ calculate_edge_loop:
     ; Now go to the jump table to decide what logic to run
 
     ; al is still the same from above and corresponds to the keystroke
-    BREAKPOINT
     xor ah, ah
     mov di, ax
     jmp [cs:di + jump_table]
 
 jump_table:
     dw case_left ; 0x00 - a = left
-    dw case_end ; 0x01 - s = down
+    ; When down is pressed skip straight to the game progress code and ignore
+    ; the timer
+    dw progress_game ; 0x01 - s = down
     dw case_right ; 0x10 - d = right
     dw case_end ; 0x11 - w = up
 
@@ -195,22 +191,56 @@ case_right_loop:
     loop case_right_loop
 
 case_end:
+    ; Increment the game clock. If we passed so many ticks then move the piece
+    ; down a notch.
+    dec byte [clock]
 
+    ; Clock not yet ticked. Don't move block down.
+    jns check_collision
 
 progress_game:
+    ; Reset the clock
+    mov byte [clock], 10
+    
     ; PROGRESS GAME STATE
     ; 1. Move floating component down
     ; Load address of bottom line of board into si
-    mov si, gameboard_floating + (BOARD_WIDTH * BOARD_HEIGHT - BOARD_WIDTH * 2)
-    ; Load address of penultimate line of board into di
-    mov di, gameboard_floating + (BOARD_WIDTH * BOARD_HEIGHT - BOARD_WIDTH * 1)
+    mov si, gameboard_floating + (BOARD_WIDTH * BOARD_HEIGHT - BOARD_WIDTH)
+    ; Load address of line-beyond-last-line into di (this array goes 1 beyond
+    ; the board height)
+    mov di, gameboard_floating + (BOARD_WIDTH * BOARD_HEIGHT)
     ; Set number of copies to make
-    mov cx, (BOARD_HEIGHT - 1)
+    mov cx, BOARD_HEIGHT
     ; set direction flag to go backwards through memory
     std
     rep movsw ; copy si -> di in 1 word pieces
     cld
     ; Clear the top row. At this point the address of that is in di
-    mov word [di], 0x0000
+    ; cx is zero so use that instead of literal
+    mov word [di], cx
 
+check_collision:
+    
+    ; Has the line below the bottom line got something in it? This indicates
+    ; that a piece fell off the bottom which counts as a collision.
+    ; (The fact that it fell off the bottom is fine since we use the previous
+    ;state in gameboard_floating_backup)
+    cmp word [gameboard_floating + (BOARD_WIDTH * BOARD_HEIGHT)], 0
+    jne collide
+
+    COLLIDE_BOARDS gameboard_floating, gameboard
+    ; when COLLIDE_BOARDS finishes, ZF=1 if a collision was found
+    jnz collide
+
+    ; Nothing happened: continue looping
     jmp draw_screen
+collide:
+    BREAKPOINT
+    ; OK we've hit a collision. We need to merge the previous board state into
+    ; the set-in-stone state
+
+    MERGE_BOARD gameboard_floating_backup, gameboard
+    ; Clear the floating gameboard plus the extra collision row after it
+    CLEAR_BOARD gameboard_floating, 2
+
+    jmp main

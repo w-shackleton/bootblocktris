@@ -1,5 +1,7 @@
 extern gameboard
 extern gameboard_floating
+extern gameboard_floating_backup
+extern clock
 
 ; The board is 16 cells across, aka 2 bytes
 BOARD_WIDTH equ 2
