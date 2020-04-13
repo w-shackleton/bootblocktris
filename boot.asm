@@ -38,6 +38,10 @@ setcs:
 
     CLS
 
+    ; TODO remove
+    mov word [gameboard + BOARD_HEIGHT * BOARD_WIDTH - 4], 0b1111000000111111
+    mov word [gameboard + BOARD_HEIGHT * BOARD_WIDTH - 2], 0b1111000011111111
+
 ; Main game logic. We flow into this from `start`
 main:
 
@@ -274,5 +278,45 @@ collide:
     MERGE_BOARD gameboard_floating_backup, gameboard
     ; Clear the floating gameboard plus the extra collision row after it
     CLEAR_BOARD gameboard_floating, 2
+
+    ; The main game board is now up to date with the latest block in place.
+    ; If a full line has been made we need to clear it.
+
+    ; We're going to copy every line to itself, but skip decrementing the
+    ; destination offset if the line is full.
+    ; We actually skimp on the logic for the top line because I'm kind of
+    ; assuming that if you've reached the top line then it's probs game over
+    ; anyway ;)
+    mov cx, BOARD_HEIGHT - 1
+    mov si, gameboard + (BOARD_HEIGHT - 1) * BOARD_WIDTH
+    mov di, si
+    ; We're going backwards through the board: set direction flag
+    std
+
+compact_loop:
+    ; A line is full if its value is 0xFFFF; we can add 1 to that and check if
+    ; the result is zero to see if the line was full
+    mov ax, [si]
+    inc ax
+    ; The line was not full: continue as normal
+    jnz compact_loop_skip_adjust_line_copy
+    ; The line IS full: take 2 from si so that we copy the previous line
+    ; to this line
+    dec si
+    dec si
+    ; This could underflow. Maybe. Need to figure out whether that's actually
+    ; something that could happen given the constraints of the game.
+    ; I don't think it is, as we'd have to fill up the top line to reach that
+    ; point which I'm going to declare as impossible..
+    dec cx
+
+compact_loop_skip_adjust_line_copy:
+    movsw
+    loop compact_loop
+
+    ; Reset direction flag
+    cld
+
+; End of compaction
 
     jmp main
