@@ -35,18 +35,14 @@
     ; cl holds the number of lines
     xor ecx, ecx
     mov cl, 4
-
-%%unpack_part2_line:
     ; bl counts the output Y bitmask
     mov bl, 0x08
+
+%%unpack_part2_line:
     ; ax = 1 (the input bitmask)
     xor ax, ax
     inc al
-    ; We use bp to hold the current index into the destination array. Yikes.
-    mov bp, cx
-    shl bp, 1
-    add bp, di
-    dec bp
+    mov bp, di
     mov dl, [si]
 
 %%unpack_part2_inner:
@@ -55,6 +51,8 @@
     jz %%unpack_skip_set_cell
     or [bp], bl
 %%unpack_skip_set_cell:
+    inc bp
+    inc bp
     shl al, 1
     cmp al, 0x10
     jne %%unpack_part2_inner
@@ -67,8 +65,6 @@
 
 
     
-
-    ; add si, (BOARD_WIDTH * 4)
     add di, (BOARD_WIDTH * 4)
     cmp di, unpacked_pieces + (NUM_PIECES * BOARD_WIDTH * 4 * 4)
     jne %%unpack_part2_loop

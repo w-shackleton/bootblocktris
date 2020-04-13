@@ -256,14 +256,21 @@ case_rotate:
     mov si, [current_piece]
     add si, unpacked_pieces
     add si, ax
-    movsw
-    movsw
-    movsw
-    movsw
 
+    ; Count the number of leading zeros in the line. We use this later
+    bsf word cx, [di]
+    ; The rotated blocks are sort of right-aligned so whack a bit off
+    jz rotate_no_decrement_adjustment
+    dec cx
 
+rotate_no_decrement_adjustment:
+    mov al, 4
+rotate_copy_loop:
+    movsw
+    shl word [di - 2], cl
+    dec al
+    jnz rotate_copy_loop
 
-rotate_end:
 
 case_end:
     ; Increment the game clock. If we passed so many ticks then move the piece
