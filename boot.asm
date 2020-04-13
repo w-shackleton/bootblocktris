@@ -23,25 +23,30 @@ setcs:
     ; leaves us the last 1536 bytes of wiggle room at 0xFFFF to use as variable
     ; storage / stack space.
 
+    ; Note that we do not use the stack.
+
     mov ax, VGA_SEGMENT
     mov ds, ax
     mov es, ax
-    mov ss, ax ; TODO if we don't end up using the stack, remove this
 
-    mov sp, 0xFFFF ; TODO if we don't end up using the stack, remove this
     cld ; Clear direction flag: make sure rep etc go up not down
 
-    ; Zero out BSS (which is set in this VGA segment)
+    ; Zero out BSS (which is set in the VGA segment)
     mov cx, __bss_sizeb
     mov di, __bss_start
     rep stosb ; stosb fills di -> cx bytes with the contents of ax
 
-; Main game logic. We flow into this from `start`
-main:
     CLS
 
-    ; Load a piece onto the screen
+; Main game logic. We flow into this from `start`
+main:
+
+    ; Load a piece onto the screen. The pieces are defined in `blocks` in
+    ; data.asm as a byte for each block: the first 4 bits are the first line,
+    ; second four the second line.
     
+    ; Use the clock as a random number source: mod it by 7 to choose the next
+    ; piece
     ; 8-bit integer divide does ax / <reg> and stores remainder in ah
     xor ax, ax
     mov dx, ax
@@ -49,10 +54,12 @@ main:
     ; There are 7 different blocks
     mov bl, 7
     div bl
-    ; Remainder now in ah; move to al and zero ah with a shift
+    ; Remainder [0 to 6] now in ah; move to al and zero ah with a shift
     shr ax, 8
     mov si, ax
+    ; Load the random block into al
     mov al, [cs:si + blocks]
+    ; Address of the gameplay piece buffer
     mov di, gameboard_floating
     mov [di], al
     ; Don't need to and it with the bitmask as the shift drops the other bits
@@ -61,6 +68,8 @@ main:
     and al, 0xF0
     mov [di + BOARD_WIDTH], al
 
+; This is where we point the ES register such that the start of the first line
+; of pixels is address es:0
 ES_START equ (VGA_SEGMENT + (SCREEN_Y_START * VGA_WIDTH + SCREEN_X_START) / 0x10)
 
 draw_screen:
@@ -88,7 +97,7 @@ draw_cell:
     ; al is now either 0 or 1; shift left to turn that into 0x00 or 0x04
     shl al, 2
 
-    ; Fill the next CELL_SIZE bytes of es:di with al (aka black or white)
+    ; Fill the next CELL_SIZE bytes of es:di with al (aka black or red)
     mov cx, CELL_SIZE
     rep stosb
 
@@ -121,6 +130,7 @@ draw_cell:
     inc bx
 
 draw_skip_increment_board:
+    ; If we've reached the end of the board, stop drawing
     cmp bx, (BOARD_WIDTH * BOARD_HEIGHT)
     jne draw_line
 
