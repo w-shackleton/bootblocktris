@@ -7,6 +7,8 @@ bits 16
 extern __bss_sizeb
 extern __bss_start
 
+extern blocks
+
 section .text
 start:
     jmp 0x0000:setcs      ; Set CS to 0
@@ -38,8 +40,26 @@ setcs:
 main:
     CLS
 
-    mov word [gameboard_floating    ], 0b0000000111000000
-    mov word [gameboard_floating + 2], 0b0000000010000000
+    ; Load a piece onto the screen
+    
+    ; 8-bit integer divide does ax / <reg> and stores remainder in ah
+    xor ax, ax
+    mov dx, ax
+    mov al, [clock]
+    ; There are 7 different blocks
+    mov bl, 7
+    div bl
+    ; Remainder now in ah; move to al and zero ah with a shift
+    shr ax, 8
+    mov si, ax
+    mov al, [cs:si + blocks]
+    mov di, gameboard_floating
+    mov [di], al
+    ; Don't need to and it with the bitmask as the shift drops the other bits
+    ; and byte [di], 0x0F
+    shl byte [di], 4
+    and al, 0xF0
+    mov [di + BOARD_WIDTH], al
 
 ES_START equ (VGA_SEGMENT + (SCREEN_Y_START * VGA_WIDTH + SCREEN_X_START) / 0x10)
 
@@ -193,15 +213,17 @@ case_right_loop:
 case_end:
     ; Increment the game clock. If we passed so many ticks then move the piece
     ; down a notch.
-    dec byte [clock]
+    mov di, clock
+    dec byte [di]
+    ; Every time the first three bits of the clock are zero (aka 1 in 8 ticks),
+    ; advance
+    mov al, 0x07
+    and al, [di]
 
     ; Clock not yet ticked. Don't move block down.
-    jns check_collision
+    jnz check_collision
 
 progress_game:
-    ; Reset the clock
-    mov byte [clock], 10
-    
     ; PROGRESS GAME STATE
     ; 1. Move floating component down
     ; Load address of bottom line of board into si

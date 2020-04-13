@@ -12,6 +12,10 @@ SECTIONS
         *(.text);
     }
 
+    .data : {
+        *(.data);
+    }
+
     /* Place the boot signature at VMA 0x7DFE */
     .sig : AT(0x7DFE) {
         SHORT(0xaa55);
