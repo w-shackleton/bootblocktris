@@ -2,6 +2,9 @@ extern gameboard
 extern gameboard_floating
 extern gameboard_floating_backup
 extern clock
+extern current_piece
+extern current_rotation
+extern unpacked_pieces
 
 ; The board is 16 cells across, aka 2 bytes
 BOARD_WIDTH equ 2
@@ -24,3 +27,5 @@ SCREEN_X_END   equ (SCREEN_X_START + (BOARD_WIDTH_RENDERED * CELL_SIZE))
 SCREEN_Y_END   equ (SCREEN_Y_START + (BOARD_HEIGHT * CELL_SIZE))
 
 SCREEN_X_WIDTH equ (SCREEN_X_END - SCREEN_X_START)
+
+NUM_PIECES equ 7

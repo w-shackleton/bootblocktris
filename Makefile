@@ -1,6 +1,6 @@
 all: game.bin
 
-boot.o: boot.asm utils.mac memory.mac
+boot.o: boot.asm utils.mac memory.mac unpacker.mac
 	nasm -f elf32 boot.asm -o boot.o
 
 memory.o: memory.asm memory.mac

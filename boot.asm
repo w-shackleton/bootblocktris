@@ -3,6 +3,7 @@ bits 16
 
 %include "utils.mac"
 %include "memory.mac"
+%include "unpacker.mac"
 
 extern __bss_sizeb
 extern __bss_start
@@ -28,6 +29,7 @@ setcs:
     mov ax, VGA_SEGMENT
     mov ds, ax
     mov es, ax
+    mov ss, ax
 
     cld ; Clear direction flag: make sure rep etc go up not down
 
@@ -38,9 +40,11 @@ setcs:
 
     CLS
 
-    ; TODO remove
-    mov word [gameboard + BOARD_HEIGHT * BOARD_WIDTH - 4], 0b1111000000111111
-    mov word [gameboard + BOARD_HEIGHT * BOARD_WIDTH - 2], 0b1111000011111111
+    UNPACK_PIECES
+
+    ; No idea why but the code below needs ss at zero
+    xor ax, ax
+    mov ss, ax
 
 ; Main game logic. We flow into this from `start`
 main:
@@ -61,16 +65,15 @@ main:
     ; Remainder [0 to 6] now in ah; move to al and zero ah with a shift
     shr ax, 8
     mov si, ax
-    ; Load the random block into al
-    mov al, [cs:si + blocks]
-    ; Address of the gameplay piece buffer
+    shl si, 3 ; mul by 8 (aka BOARD_WIDTH * 4)
+    ; Save the selected piece as its index into the unpacked_pieces array
+    mov [current_piece], si
+    mov word [current_rotation], 0
+    ; Load the random block from the unpacked pieces
+    lea si, [unpacked_pieces + si]
     mov di, gameboard_floating
-    mov [di], al
-    ; Don't need to and it with the bitmask as the shift drops the other bits
-    ; and byte [di], 0x0F
-    shl byte [di], 4
-    and al, 0xF0
-    mov [di + BOARD_WIDTH], al
+    movsw
+    movsw
 
 ; This is where we point the ES register such that the start of the first line
 ; of pixels is address es:0
@@ -197,7 +200,7 @@ jump_table:
     ; the timer
     dw progress_game ; 0x01 - s = down
     dw case_right ; 0x10 - d = right
-    dw case_end ; 0x11 - w = up
+    dw case_rotate ; 0x11 - w = up
 
 case_left:
     ; Check if we've hit the limit. If we have then don't allow moving left
@@ -223,6 +226,44 @@ case_right_loop:
     inc di
     inc di
     loop case_right_loop
+    jmp case_end
+
+case_rotate:
+    ; Oh boy.
+
+    ; First work out which line the block starts at
+    mov di, gameboard_floating
+    mov cx, BOARD_HEIGHT
+    ; set ax to 0
+    xor ax, ax
+    repz scasw
+    dec di
+    dec di
+    ; di now contains a pointer to the line containing the piece
+
+    ; calculate the offset into the array based on the current rotation, plus
+    ; increment the current rotation
+    mov si, current_rotation
+    inc word [si]
+    and word [si], 0x03 ; chop it to 0,1,2,3
+    mov ax, [si]
+    ; There are 7 pieces. Add the required offset in here too
+    mov bl, NUM_PIECES * BOARD_WIDTH * 4
+    mul bl
+    ; The rotation based offset is now in ax
+
+    ; Load the currently selected piece into si; this is in the range 0-6 * 8
+    mov si, [current_piece]
+    add si, unpacked_pieces
+    add si, ax
+    movsw
+    movsw
+    movsw
+    movsw
+
+
+
+rotate_end:
 
 case_end:
     ; Increment the game clock. If we passed so many ticks then move the piece
@@ -271,7 +312,6 @@ check_collision:
     ; Nothing happened: continue looping
     jmp draw_screen
 collide:
-    BREAKPOINT
     ; OK we've hit a collision. We need to merge the previous board state into
     ; the set-in-stone state
 

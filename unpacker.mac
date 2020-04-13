@@ -1,0 +1,77 @@
+%include "memory.mac"
+
+%macro UNPACK_PIECES 0
+    xor esi, esi
+    ; INITIAL STEP - unpack pieces into rotation set 0
+    ; setup. si = the piece we're processing, di = the memory location we're
+    ; unpacking to
+    mov cx, NUM_PIECES
+    mov di, unpacked_pieces
+    ; Save this for later
+    mov bx, di
+
+%%unpack_part1_loop:
+    mov si, cx
+    dec si
+    mov al, [cs:si + blocks]
+    mov [di], al
+    and byte [di], 0x0F
+    ; Don't need to and it with the bitmask as the shift drops the other bits
+    shr al, 4
+    mov [di + BOARD_WIDTH], al
+
+    add di, (BOARD_WIDTH * 4)
+    loop %%unpack_part1_loop
+
+    ; OK so now the blocks are unpacked into the first set of memory locations.
+    ; Iteratively rotate them.
+
+    ; di points to the start of the first rotated set, si points to the
+    ; original set, cx is zero. We're going to count up not down so can't use
+    ; loop but oh well.
+    mov si, bx
+    
+%%unpack_part2_loop:
+    ; cl holds the number of lines
+    xor ecx, ecx
+    mov cl, 4
+
+%%unpack_part2_line:
+    ; bl counts the output Y bitmask
+    mov bl, 0x08
+    ; ax = 1 (the input bitmask)
+    xor ax, ax
+    inc al
+    ; We use bp to hold the current index into the destination array. Yikes.
+    mov bp, cx
+    shl bp, 1
+    add bp, di
+    dec bp
+    mov dl, [si]
+
+%%unpack_part2_inner:
+    ; dl holds the currently loaded line
+    test dl, al
+    jz %%unpack_skip_set_cell
+    or [bp], bl
+%%unpack_skip_set_cell:
+    shl al, 1
+    cmp al, 0x10
+    jne %%unpack_part2_inner
+
+    ; Move onto the next line
+    inc si
+    inc si
+    shr bl, 1
+    loop %%unpack_part2_line
+
+
+    
+
+    ; add si, (BOARD_WIDTH * 4)
+    add di, (BOARD_WIDTH * 4)
+    cmp di, unpacked_pieces + (NUM_PIECES * BOARD_WIDTH * 4 * 4)
+    jne %%unpack_part2_loop
+
+
+%endmacro
